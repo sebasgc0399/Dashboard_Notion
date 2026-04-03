@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm create:*)",
+      "Bash(cp -r /c/Proyectos/dashboard_notion_temp/* /c/Proyectos/dashboard_notion/)",
+      "Bash(cp /c/Proyectos/dashboard_notion_temp/.gitignore /c/Proyectos/dashboard_notion/)",
+      "Bash(cp /c/Proyectos/dashboard_notion_temp/tsconfig*.json /c/Proyectos/dashboard_notion/)",
+      "Bash(rm -rf /c/Proyectos/dashboard_notion_temp)",
+      "Bash(npm install:*)",
+      "Bash(node -e \"console.log\\(require\\('./package.json'\\).dependencies.react\\)\")",
+      "Bash(npx shadcn@latest init -d)"
+    ]
+  }
+}

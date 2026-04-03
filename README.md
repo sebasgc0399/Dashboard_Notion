@@ -1,73 +1,82 @@
-# React + TypeScript + Vite
+# Segundo Cerebro Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Dashboard web de productividad que visualiza datos de un workspace de Notion en tiempo real. Conecta con el sistema "Segundo Cerebro" y muestra metricas de habitos, tareas y proyectos en graficos interactivos.
 
-Currently, two official plugins are available:
+**Live:** [dashboard-productividad-e7c1d.web.app](https://dashboard-productividad-e7c1d.web.app)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Vistas
 
-## React Compiler
+- **General** - 4 KPIs + tendencia de habitos + distribucion de tareas + proyectos en progreso
+- **Habitos** - Heatmap (14 habitos x 30 dias) + chart de consistencia por habito
+- **Tareas** - Lista completa con badges de status y prioridad
+- **Proyectos** - Distribucion por status + lista completa
+- **Settings** - Configuracion del Notion Integration Token
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Stack
 
-## Expanding the ESLint configuration
+| Capa | Tecnologia |
+|------|-----------|
+| Framework | React 19 + TypeScript |
+| Build | Vite |
+| Estilos | Tailwind CSS v4 + shadcn/ui |
+| Graficos | Recharts |
+| Routing | React Router v7 |
+| Iconos | Lucide React |
+| Hosting | Firebase Hosting |
+| Proxy | Firebase Cloud Functions v2 |
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Arquitectura
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```
+Frontend (SPA)  -->  Firebase Cloud Function  -->  Notion API
+React + Vite        (Proxy CORS)                   v2022-06-28
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+La API de Notion bloquea CORS desde browsers. La Cloud Function recibe el request del frontend, lo reenvia a Notion con el token, y devuelve la respuesta. Solo permite paths con prefijo `databases/`.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Setup local
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+# Instalar dependencias
+npm install
+
+# Variables de entorno
+cp .env.example .env
+# Editar .env con la URL de tu Cloud Function
+
+# Desarrollo
+npm run dev
 ```
+
+## Deploy
+
+```bash
+# Cloud Function
+cd functions && npm install && cd ..
+firebase deploy --only functions
+
+# Frontend
+npm run build
+firebase deploy --only hosting
+```
+
+## Estructura del proyecto
+
+```
+src/
+  components/     # UI components (StatCard, Charts, Heatmap, Lists, etc.)
+  pages/          # Overview, Habits, Tasks, Projects, Settings
+  hooks/          # useNotionData (fetch + state + derived data)
+  services/       # notion.ts (API), tokenStore.ts (localStorage)
+  types/          # TypeScript interfaces
+  constants.ts    # Habits list, DB IDs, colors
+functions/
+  src/index.ts    # Cloud Function proxy
+```
+
+## Uso
+
+1. Crear una [Notion Integration](https://www.notion.so/my-integrations) con acceso a las bases de datos del Segundo Cerebro
+2. Abrir el dashboard y ir a Settings
+3. Ingresar el Integration Token y probar la conexion
+4. El dashboard carga automaticamente los datos de habitos, tareas y proyectos

@@ -25,4 +25,14 @@ functions/node_modules
 *.njsproj
 *.sln
 *.sw?
--e "\n.firebase/\n.claude/" 
+
+# Firebase cache
+.firebase/
+
+# Claude Code
+.claude/
+
+# Vite boilerplate leftovers
+public/icons.svg
+src/assets/hero.png
+src/assets/vite.svg

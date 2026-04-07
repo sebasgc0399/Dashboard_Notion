@@ -32,7 +32,7 @@ Frontend (SPA)  -->  Firebase Cloud Function  -->  Notion API
 React + Vite        (Proxy CORS)                   v2022-06-28
 ```
 
-La API de Notion bloquea CORS desde browsers. La Cloud Function recibe el request del frontend, lo reenvia a Notion con el token, y devuelve la respuesta. Solo permite paths con prefijo `databases/`.
+La API de Notion bloquea CORS desde browsers. La Cloud Function recibe el request del frontend, lo reenvia a Notion con el token, y devuelve la respuesta. Solo permite paths con prefijo `databases/` o el path `search` (usado para auto-descubrir los databases del usuario).
 
 ## Setup local
 
@@ -67,16 +67,19 @@ src/
   components/     # UI components (StatCard, Charts, Heatmap, Lists, etc.)
   pages/          # Overview, Habits, Tasks, Projects, Settings
   hooks/          # useNotionData (fetch + state + derived data)
-  services/       # notion.ts (API), tokenStore.ts (localStorage)
+  services/       # notion.ts (API + resolver), tokenStore.ts, dbIdsStore.ts
   types/          # TypeScript interfaces
-  constants.ts    # Habits list, DB IDs, colors
+  constants.ts    # Habits list, colors
 functions/
   src/index.ts    # Cloud Function proxy
 ```
 
 ## Uso
 
-1. Crear una [Notion Integration](https://www.notion.so/my-integrations) con acceso a las bases de datos del Segundo Cerebro
-2. Abrir el dashboard y ir a Settings
-3. Ingresar el Integration Token y probar la conexion
-4. El dashboard carga automaticamente los datos de habitos, tareas y proyectos
+1. Crear una [Notion Integration](https://www.notion.so/my-integrations) en tu workspace y copiar el Integration Token.
+2. **Conectar la integracion a tus paginas.** En Notion, abri la pagina raiz del Segundo Cerebro -> menu `...` -> **Connections** -> seleccionar tu integracion. La conexion se hereda a todos los databases anidados (Habitos, Tareas, Proyectos), asi no hace falta hacerlo uno por uno.
+3. Abrir el dashboard, ir a Settings, pegar el Integration Token y **Guardar**.
+4. La app intenta auto-descubrir los 3 databases por nombre (`Habitos`/`Tareas`/`Proyectos`) usando `POST /v1/search`. Si los encuentra sin ambiguedad, te lleva directo al dashboard.
+5. Si alguno no se resuelve automaticamente (renombrado, ambiguo o sin acceso), el panel **Databases** en Settings te deja pegar los IDs faltantes a mano. Cada slot muestra el estado: `Resuelto` / `Ambiguo` / `No encontrado` / `Manual`.
+
+> Para obtener el ID de un database manualmente: en Notion, abrir el database como pagina completa, copiar la URL y tomar el segmento de 32 caracteres (UUID) antes del `?v=`.

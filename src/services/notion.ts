@@ -1,7 +1,14 @@
 import { tokenStore } from "./tokenStore";
 import { dbIdsStore, type DbIds, type DbKey } from "./dbIdsStore";
 import { HABITS_LIST } from "@/constants";
-import type { HabitDay, Task, Project } from "@/types";
+import type {
+  HabitDay,
+  Task,
+  Project,
+  DbSchema,
+  TaskUpdate,
+  ProjectUpdate,
+} from "@/types";
 
 const PROXY_URL = import.meta.env.VITE_PROXY_URL;
 
@@ -13,6 +20,13 @@ export class NotionApiError extends Error {
   }
 }
 
+export class NotionPermissionError extends NotionApiError {
+  constructor(message: string) {
+    super(403, message);
+    this.name = "NotionPermissionError";
+  }
+}
+
 export class MissingDbIdError extends Error {
   missing: DbKey[];
   constructor(missing: DbKey[]) {
@@ -21,26 +35,55 @@ export class MissingDbIdError extends Error {
   }
 }
 
-async function callProxy(path: string, body: object): Promise<any> {
+export class SchemaPropNotFoundError extends Error {
+  dbKey: DbKey;
+  expectedType: string;
+  constructor(dbKey: DbKey, expectedType: string) {
+    super(
+      `No se encontró una propiedad de tipo "${expectedType}" en el database "${dbKey}"`
+    );
+    this.name = "SchemaPropNotFoundError";
+    this.dbKey = dbKey;
+    this.expectedType = expectedType;
+  }
+}
+
+interface ProxyOptions {
+  method?: "GET" | "POST" | "PATCH";
+  body?: object;
+}
+
+async function callProxy(path: string, options: ProxyOptions = {}): Promise<any> {
+  const { method = "POST", body } = options;
   const token = tokenStore.get();
   if (!token) throw new Error("No token");
 
+  const init: RequestInit = {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      "x-notion-token": token,
+    },
+  };
+  if (method !== "GET" && body !== undefined) {
+    init.body = JSON.stringify(body);
+  }
+
   let res: Response;
   try {
-    res = await fetch(`${PROXY_URL}?path=${path}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-notion-token": token,
-      },
-      body: JSON.stringify(body),
-    });
+    res = await fetch(`${PROXY_URL}?path=${path}`, init);
   } catch {
     throw new TypeError("No se pudo conectar. Revisá tu conexión a internet.");
   }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
+    const code = err?.code as string | undefined;
+    if (res.status === 403 && code === "restricted_resource") {
+      throw new NotionPermissionError(
+        err.message || "La integración no tiene permisos suficientes"
+      );
+    }
     throw new NotionApiError(res.status, err.message || `Error ${res.status}`);
   }
 
@@ -48,7 +91,7 @@ async function callProxy(path: string, body: object): Promise<any> {
 }
 
 function queryNotion(databaseId: string, body: object): Promise<any> {
-  return callProxy(`databases/${databaseId}/query`, body);
+  return callProxy(`databases/${databaseId}/query`, { body });
 }
 
 function requireDbId(key: DbKey): string {
@@ -178,7 +221,7 @@ export async function resolveDatabaseIds(): Promise<ResolveResult> {
     };
     if (cursor) body.start_cursor = cursor;
 
-    const res = await callProxy("search", body);
+    const res = await callProxy("search", { body });
     if (Array.isArray(res?.results)) collected.push(...res.results);
 
     // Early exit: if we already have a clean resolution for all 3, stop.
@@ -206,8 +249,10 @@ export async function testConnection(): Promise<boolean> {
   // A successful search call proves the token is valid; the resolver
   // tells us whether the integration can see the expected databases.
   await callProxy("search", {
-    filter: { value: "database", property: "object" },
-    page_size: 1,
+    body: {
+      filter: { value: "database", property: "object" },
+      page_size: 1,
+    },
   });
   return true;
 }
@@ -235,6 +280,7 @@ export async function fetchHabits(): Promise<HabitDay[]> {
       );
 
       return {
+        id: result.id,
         date,
         completed: completed as string[],
         pct: Math.round((completed.length / totalHabits) * 100),
@@ -283,4 +329,131 @@ export async function fetchProjects(): Promise<Project[]> {
     priority: result.properties.Prioridad?.select?.name ?? null,
     areaIds: result.properties.Area?.relation?.map((r: any) => r.id) ?? [],
   }));
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Schema fetchers — resolución de propiedades por tipo
+// ────────────────────────────────────────────────────────────────────────────
+
+function findPropByType(
+  properties: Record<string, any>,
+  type: string
+): { name: string; def: any } | null {
+  for (const [name, def] of Object.entries(properties)) {
+    if (def?.type === type) return { name, def };
+  }
+  return null;
+}
+
+async function fetchEditableSchema(
+  dbKey: "tasks" | "projects",
+  opts: { requireDate: boolean }
+): Promise<DbSchema> {
+  const dbId = requireDbId(dbKey);
+  const res = await callProxy(`databases/${dbId}`, { method: "GET" });
+  const props = res.properties ?? {};
+
+  const statusProp = findPropByType(props, "status");
+  if (!statusProp) throw new SchemaPropNotFoundError(dbKey, "status");
+
+  const priorityProp = findPropByType(props, "select");
+  if (!priorityProp) throw new SchemaPropNotFoundError(dbKey, "select");
+
+  const schema: DbSchema = {
+    statusPropName: statusProp.name,
+    status: (statusProp.def.status?.options ?? []).map((o: any) => ({
+      name: o.name,
+      color: o.color,
+    })),
+    priorityPropName: priorityProp.name,
+    priority: (priorityProp.def.select?.options ?? []).map((o: any) => ({
+      name: o.name,
+      color: o.color,
+    })),
+  };
+
+  if (opts.requireDate) {
+    const dateProp = findPropByType(props, "date");
+    if (!dateProp) throw new SchemaPropNotFoundError(dbKey, "date");
+    schema.datePropName = dateProp.name;
+  }
+
+  return schema;
+}
+
+export function fetchTasksSchema(): Promise<DbSchema> {
+  return fetchEditableSchema("tasks", { requireDate: true });
+}
+
+export function fetchProjectsSchema(): Promise<DbSchema> {
+  return fetchEditableSchema("projects", { requireDate: false });
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Mutations — todas asumen que el caller pasó el schema correspondiente
+// ────────────────────────────────────────────────────────────────────────────
+
+async function patchPage(pageId: string, properties: object): Promise<void> {
+  await callProxy(`pages/${pageId}`, {
+    method: "PATCH",
+    body: { properties },
+  });
+}
+
+export async function updateHabitCheckbox(
+  pageId: string,
+  habitName: string,
+  value: boolean
+): Promise<void> {
+  // El nombre del checkbox es el nombre del hábito (acoplamiento explícito con HABITS_LIST).
+  await patchPage(pageId, {
+    [habitName]: { checkbox: value },
+  });
+}
+
+export async function updateTaskFields(
+  pageId: string,
+  fields: TaskUpdate,
+  schema: DbSchema
+): Promise<void> {
+  const properties: Record<string, any> = {};
+
+  if (fields.status !== undefined) {
+    properties[schema.statusPropName] = { status: { name: fields.status } };
+  }
+  if (fields.priority !== undefined) {
+    properties[schema.priorityPropName] =
+      fields.priority === null
+        ? { select: null }
+        : { select: { name: fields.priority } };
+  }
+  if (fields.date !== undefined) {
+    if (!schema.datePropName) {
+      throw new SchemaPropNotFoundError("tasks", "date");
+    }
+    properties[schema.datePropName] =
+      fields.date === null ? { date: null } : { date: { start: fields.date } };
+  }
+
+  await patchPage(pageId, properties);
+}
+
+export async function updateProjectFields(
+  pageId: string,
+  fields: ProjectUpdate,
+  schema: DbSchema
+): Promise<void> {
+  const properties: Record<string, any> = {};
+
+  if (fields.status !== undefined) {
+    properties[schema.statusPropName] = { status: { name: fields.status } };
+  }
+  if (fields.priority !== undefined) {
+    properties[schema.priorityPropName] =
+      fields.priority === null
+        ? { select: null }
+        : { select: { name: fields.priority } };
+  }
+
+  await patchPage(pageId, properties);
 }

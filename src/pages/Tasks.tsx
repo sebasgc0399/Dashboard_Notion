@@ -3,16 +3,27 @@ import { SectionSkeleton } from "@/components/SectionSkeleton";
 import { ErrorInline } from "@/components/ErrorInline";
 import { EmptyState } from "@/components/EmptyState";
 import { TaskList } from "@/components/TaskList";
-import type { Task } from "@/types";
+import type { Task, DbSchema, TaskUpdate } from "@/types";
 
 interface TasksProps {
   tasks: Task[] | null;
   loading: boolean;
   error?: string;
   onRetry: () => void;
+  tasksSchema: DbSchema | null;
+  pendingMutations: Set<string>;
+  updateTask: (taskId: string, fields: TaskUpdate) => void;
 }
 
-export function Tasks({ tasks, loading, error, onRetry }: TasksProps) {
+export function Tasks({
+  tasks,
+  loading,
+  error,
+  onRetry,
+  tasksSchema,
+  pendingMutations,
+  updateTask,
+}: TasksProps) {
   if (loading) {
     return (
       <div className="animate-fade-in">
@@ -41,7 +52,12 @@ export function Tasks({ tasks, loading, error, onRetry }: TasksProps) {
           Tareas activas
           <span className="ml-2 font-mono text-text-muted">({tasks.length})</span>
         </h2>
-        <TaskList tasks={tasks} />
+        <TaskList
+          tasks={tasks}
+          tasksSchema={tasksSchema}
+          pendingMutations={pendingMutations}
+          updateTask={updateTask}
+        />
       </section>
     </div>
   );

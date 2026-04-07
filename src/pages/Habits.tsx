@@ -12,9 +12,19 @@ interface HabitsProps {
   loading: boolean;
   error?: string;
   onRetry: () => void;
+  pendingMutations: Set<string>;
+  updateHabit: (dayPageId: string, habit: string, value: boolean) => void;
 }
 
-export function Habits({ habits, habitFreq, loading, error, onRetry }: HabitsProps) {
+export function Habits({
+  habits,
+  habitFreq,
+  loading,
+  error,
+  onRetry,
+  pendingMutations,
+  updateHabit,
+}: HabitsProps) {
   if (loading) {
     return (
       <div className="animate-fade-in space-y-6">
@@ -44,7 +54,11 @@ export function Habits({ habits, habitFreq, loading, error, onRetry }: HabitsPro
         <h2 className="mb-4 text-sm font-medium text-text-secondary">
           Hábitos diarios
         </h2>
-        <HabitHeatmap habits={habits} />
+        <HabitHeatmap
+          habits={habits}
+          pendingMutations={pendingMutations}
+          updateHabit={updateHabit}
+        />
       </section>
 
       {/* Consistency chart */}

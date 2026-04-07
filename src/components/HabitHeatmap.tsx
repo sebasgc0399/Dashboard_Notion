@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { HABITS_LIST } from "@/constants";
+import { cn } from "@/lib/utils";
 import type { HabitDay } from "@/types";
 
 const COLOR_DONE = "#10b981";
@@ -8,6 +9,8 @@ const COLOR_NO_DATA = "#131316";
 
 interface HabitHeatmapProps {
   habits: HabitDay[];
+  pendingMutations: Set<string>;
+  updateHabit: (dayPageId: string, habit: string, value: boolean) => void;
 }
 
 interface CellInfo {
@@ -43,28 +46,24 @@ function cellColor(state: CellInfo["state"]): string {
   }
 }
 
-export function HabitHeatmap({ habits }: HabitHeatmapProps) {
+export function HabitHeatmap({ habits, pendingMutations, updateHabit }: HabitHeatmapProps) {
   const [tooltip, setTooltip] = useState<CellInfo | null>(null);
 
-  // Dates sorted ascending (oldest first for left-to-right)
-  const dates = useMemo(
-    () => [...habits].reverse().map((h) => h.date),
-    [habits]
-  );
+  // Days sorted ascending (oldest first for left-to-right)
+  const days = useMemo(() => [...habits].reverse(), [habits]);
+  const dates = useMemo(() => days.map((d) => d.date), [days]);
 
-  // Quick lookup: date -> Set of completed habits
-  const completedMap = useMemo(() => {
-    const map = new Map<string, Set<string>>();
-    for (const day of habits) {
-      map.set(day.date, new Set(day.completed));
-    }
+  // Quick lookup: date -> HabitDay (gives us id + completed list)
+  const dayMap = useMemo(() => {
+    const map = new Map<string, HabitDay>();
+    for (const day of habits) map.set(day.date, day);
     return map;
   }, [habits]);
 
   function getCellState(habit: string, date: string): CellInfo["state"] {
-    const dayData = completedMap.get(date);
-    if (!dayData) return "no_data";
-    return dayData.has(habit) ? "done" : "not_done";
+    const day = dayMap.get(date);
+    if (!day) return "no_data";
+    return day.completed.includes(habit) ? "done" : "not_done";
   }
 
   const colCount = dates.length;
@@ -103,11 +102,26 @@ export function HabitHeatmap({ habits }: HabitHeatmapProps) {
               {/* Cells */}
               {dates.map((date) => {
                 const state = getCellState(habit, date);
+                const day = dayMap.get(date);
+                const isClickable = state !== "no_data" && day !== undefined;
+                const isPending = day
+                  ? pendingMutations.has(`${day.id}:${habit}`)
+                  : false;
                 return (
                   <div
                     key={`${habit}-${date}`}
-                    className="size-[22px] rounded-sm cursor-pointer transition-transform hover:scale-110"
+                    className={cn(
+                      "size-[22px] rounded-sm transition-transform",
+                      isClickable
+                        ? "cursor-pointer hover:scale-110"
+                        : "cursor-not-allowed",
+                      isPending && "opacity-50"
+                    )}
                     style={{ backgroundColor: cellColor(state) }}
+                    onClick={() => {
+                      if (!isClickable || !day) return;
+                      updateHabit(day.id, habit, state === "not_done");
+                    }}
                     onMouseEnter={() =>
                       setTooltip({ habit, date, state })
                     }

@@ -1,6 +1,7 @@
 import { NavLink } from "react-router";
 import { RefreshCw, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Toaster } from "@/components/Toaster";
 import { cn } from "@/lib/utils";
 
 interface LayoutProps {
@@ -78,6 +79,8 @@ export function Layout({ onRefresh, isLoading, children }: LayoutProps) {
       <main className="mx-auto max-w-6xl px-4 py-6">
         {children}
       </main>
+
+      <Toaster />
     </div>
   );
 }

@@ -49,13 +49,15 @@ function DashboardShell() {
   const data = useNotionData();
   const isLoading =
     data.loading.habits || data.loading.tasks || data.loading.projects;
+  // Block refresh while mutations are in flight to avoid clobbering optimistic state.
+  const isBusy = isLoading || data.pendingMutations.size > 0;
 
   if (!tokenStore.exists()) {
     return <Navigate to="/settings" replace />;
   }
 
   return (
-    <Layout onRefresh={data.refresh} isLoading={isLoading}>
+    <Layout onRefresh={data.refresh} isLoading={isBusy}>
       <DbIdsMissingBanner missing={data.dbIdsMissing} />
       <Outlet context={data} />
     </Layout>
@@ -116,6 +118,8 @@ function HabitsPage() {
       loading={data.loading.habits}
       error={data.errors.habits}
       onRetry={data.refresh}
+      pendingMutations={data.pendingMutations}
+      updateHabit={data.updateHabit}
     />
   );
 }
@@ -128,6 +132,9 @@ function TasksPage() {
       loading={data.loading.tasks}
       error={data.errors.tasks}
       onRetry={data.refresh}
+      tasksSchema={data.tasksSchema}
+      pendingMutations={data.pendingMutations}
+      updateTask={data.updateTask}
     />
   );
 }
@@ -141,6 +148,9 @@ function ProjectsPage() {
       loading={data.loading.projects}
       error={data.errors.projects}
       onRetry={data.refresh}
+      projectsSchema={data.projectsSchema}
+      pendingMutations={data.pendingMutations}
+      updateProject={data.updateProject}
     />
   );
 }

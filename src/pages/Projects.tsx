@@ -4,7 +4,7 @@ import { ErrorInline } from "@/components/ErrorInline";
 import { EmptyState } from "@/components/EmptyState";
 import { ProjectBarChart } from "@/components/Charts";
 import { ProjectList } from "@/components/ProjectList";
-import type { Project } from "@/types";
+import type { Project, DbSchema, ProjectUpdate } from "@/types";
 
 interface ProjectsProps {
   projects: Project[] | null;
@@ -12,6 +12,9 @@ interface ProjectsProps {
   loading: boolean;
   error?: string;
   onRetry: () => void;
+  projectsSchema: DbSchema | null;
+  pendingMutations: Set<string>;
+  updateProject: (projectId: string, fields: ProjectUpdate) => void;
 }
 
 export function Projects({
@@ -20,6 +23,9 @@ export function Projects({
   loading,
   error,
   onRetry,
+  projectsSchema,
+  pendingMutations,
+  updateProject,
 }: ProjectsProps) {
   if (loading) {
     return (
@@ -60,7 +66,12 @@ export function Projects({
             ({projects.length})
           </span>
         </h2>
-        <ProjectList projects={projects} />
+        <ProjectList
+          projects={projects}
+          projectsSchema={projectsSchema}
+          pendingMutations={pendingMutations}
+          updateProject={updateProject}
+        />
       </section>
     </div>
   );

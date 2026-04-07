@@ -60,6 +60,27 @@ export const PRIORITY_COLORS: Record<string, string> = {
   "Low": "#71717a",
 } as const;
 
+/** Notion option color names → hex tokens compatibles con el tema dark */
+export const NOTION_COLOR_MAP: Record<
+  string,
+  { bg: string; text: string; border: string }
+> = {
+  default: { bg: "rgba(113, 113, 122, 0.15)", text: "#a1a1aa", border: "rgba(113, 113, 122, 0.3)" },
+  gray:    { bg: "rgba(113, 113, 122, 0.15)", text: "#a1a1aa", border: "rgba(113, 113, 122, 0.3)" },
+  brown:   { bg: "rgba(146, 64, 14, 0.15)",   text: "#d97706", border: "rgba(146, 64, 14, 0.3)" },
+  orange:  { bg: "rgba(249, 115, 22, 0.15)",  text: "#fb923c", border: "rgba(249, 115, 22, 0.3)" },
+  yellow:  { bg: "rgba(245, 158, 11, 0.15)",  text: "#fbbf24", border: "rgba(245, 158, 11, 0.3)" },
+  green:   { bg: "rgba(16, 185, 129, 0.15)",  text: "#34d399", border: "rgba(16, 185, 129, 0.3)" },
+  blue:    { bg: "rgba(59, 130, 246, 0.15)",  text: "#60a5fa", border: "rgba(59, 130, 246, 0.3)" },
+  purple:  { bg: "rgba(139, 92, 246, 0.15)",  text: "#a78bfa", border: "rgba(139, 92, 246, 0.3)" },
+  pink:    { bg: "rgba(236, 72, 153, 0.15)",  text: "#f472b6", border: "rgba(236, 72, 153, 0.3)" },
+  red:     { bg: "rgba(239, 68, 68, 0.15)",   text: "#f87171", border: "rgba(239, 68, 68, 0.3)" },
+};
+
+export function getNotionColor(color: string | undefined) {
+  return NOTION_COLOR_MAP[color ?? "default"] ?? NOTION_COLOR_MAP.default;
+}
+
 /** Abbreviations for habit names (chart axes) */
 export const HABIT_ABBREVIATIONS: Record<string, string> = {
   "Ejercicio": "Ejerc.",

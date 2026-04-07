@@ -1,7 +1,32 @@
 export interface HabitDay {
+  id: string;
   date: string;
   completed: string[];
   pct: number;
+}
+
+export interface SchemaOption {
+  name: string;
+  color: string;
+}
+
+export interface DbSchema {
+  statusPropName: string;
+  status: SchemaOption[];
+  priorityPropName: string;
+  priority: SchemaOption[];
+  datePropName?: string;
+}
+
+export interface TaskUpdate {
+  status?: string;
+  priority?: string | null;
+  date?: string | null;
+}
+
+export interface ProjectUpdate {
+  status?: string;
+  priority?: string | null;
 }
 
 export interface Task {
@@ -62,4 +87,11 @@ export interface NotionData {
   projectsByStatus: Record<string, number>;
   habitFreq: HabitFreq[];
   refresh: () => void;
+  // Phase 3
+  tasksSchema: DbSchema | null;
+  projectsSchema: DbSchema | null;
+  pendingMutations: Set<string>;
+  updateHabit: (dayPageId: string, habit: string, value: boolean) => void;
+  updateTask: (taskId: string, fields: TaskUpdate) => void;
+  updateProject: (projectId: string, fields: ProjectUpdate) => void;
 }

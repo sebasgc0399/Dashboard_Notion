@@ -1,7 +1,7 @@
 import { onRequest } from "firebase-functions/v2/https";
 
-const ALLOWED_PATH_PREFIXES = ["databases/", "search"];
-const ALLOWED_METHODS = ["POST"];
+const ALLOWED_PATH_PREFIXES = ["databases/", "pages/", "search"];
+const ALLOWED_METHODS = ["GET", "POST", "PATCH"];
 
 export const notionProxy = onRequest({ cors: true }, async (req, res) => {
   if (!ALLOWED_METHODS.includes(req.method)) {
@@ -28,15 +28,18 @@ export const notionProxy = onRequest({ cors: true }, async (req, res) => {
   }
 
   try {
-    const response = await fetch(`https://api.notion.com/v1/${path}`, {
+    const init: RequestInit = {
       method: req.method,
       headers: {
         "Authorization": `Bearer ${token}`,
         "Notion-Version": "2022-06-28",
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(req.body),
-    });
+    };
+    if (req.method !== "GET") {
+      init.body = JSON.stringify(req.body);
+    }
+    const response = await fetch(`https://api.notion.com/v1/${path}`, init);
 
     const data = await response.json();
     res.status(response.status).json(data);

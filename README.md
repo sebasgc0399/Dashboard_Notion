@@ -78,6 +78,9 @@ functions/
 
 1. Crear una [Notion Integration](https://www.notion.so/my-integrations) en tu workspace y copiar el Integration Token.
 2. **Conectar la integracion a tus paginas.** En Notion, abri la pagina raiz del Segundo Cerebro -> menu `...` -> **Connections** -> seleccionar tu integracion. La conexion se hereda a todos los databases anidados (Habitos, Tareas, Proyectos), asi no hace falta hacerlo uno por uno.
+
+   > **Para usar el modo edicion** (cambiar status, prioridades, fechas y togglear habitos desde el dashboard), tu integracion ademas necesita el capability **"Update content"** habilitado. Andá a [notion.so/my-integrations](https://www.notion.so/my-integrations) → tu integracion → tab **Capabilities** → marcá *"Update content"*. Sin esto, la app sigue funcionando en modo solo lectura y los intentos de edicion muestran un toast con instrucciones.
+
 3. Abrir el dashboard, ir a Settings, pegar el Integration Token y **Guardar**.
 4. La app intenta auto-descubrir los 3 databases por nombre (`Habitos`/`Tareas`/`Proyectos`) usando `POST /v1/search`. Si los encuentra sin ambiguedad, te lleva directo al dashboard.
 5. Si alguno no se resuelve automaticamente (renombrado, ambiguo o sin acceso), el panel **Databases** en Settings te deja pegar los IDs faltantes a mano. Cada slot muestra el estado: `Resuelto` / `Ambiguo` / `No encontrado` / `Manual`.

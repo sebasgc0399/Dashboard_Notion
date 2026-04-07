@@ -1,16 +1,22 @@
 # Segundo Cerebro Dashboard
 
-Dashboard web de productividad que visualiza datos de un workspace de Notion en tiempo real. Conecta con el sistema "Segundo Cerebro" y muestra metricas de habitos, tareas y proyectos en graficos interactivos.
+Dashboard web de productividad que visualiza **y edita** datos de un workspace de Notion en tiempo real. Conecta con el sistema "Segundo Cerebro", muestra metricas de habitos, tareas y proyectos en graficos interactivos, y permite editar los campos mas frecuentes (status, prioridad, fechas, checkboxes de habitos) directamente desde el dashboard sin abrir Notion.
 
 **Live:** [dashboard-productividad-e7c1d.web.app](https://dashboard-productividad-e7c1d.web.app)
 
 ## Vistas
 
-- **General** - 4 KPIs + tendencia de habitos + distribucion de tareas + proyectos en progreso
-- **Habitos** - Heatmap (14 habitos x 30 dias) + chart de consistencia por habito
-- **Tareas** - Lista completa con badges de status y prioridad
-- **Proyectos** - Distribucion por status + lista completa
-- **Settings** - Configuracion del Notion Integration Token
+- **General** - 4 KPIs + tendencia de habitos + distribucion de tareas + proyectos en progreso *(solo lectura)*
+- **Habitos** - Heatmap (14 habitos x 30 dias) + chart de consistencia. **Click en una celda** para togglear el checkbox del dia
+- **Tareas** - Lista completa. Status, prioridad y fecha **editables inline** (click en el chip o la fecha)
+- **Proyectos** - Distribucion por status + lista. Status y prioridad **editables inline**
+- **Settings** - Configuracion del Notion Integration Token + override manual de IDs de databases
+
+### Modo edicion
+
+Las ediciones usan **optimistic updates con rollback**: el cambio se ve al instante en pantalla y en background se sincroniza con Notion. Si Notion rechaza la mutacion (token expirado, valor invalido, falta capability, timeout >12s, etc.), el UI hace rollback al ultimo valor confirmado y muestra un toast con la causa. Clicks rapidos sobre el mismo campo se **coalescen**: solo el ultimo valor llega a Notion, los intermedios se descartan.
+
+Mientras hay mutaciones en vuelo, el boton de refresh queda deshabilitado para evitar clobbering del estado optimista.
 
 ## Stack
 
@@ -32,7 +38,11 @@ Frontend (SPA)  -->  Firebase Cloud Function  -->  Notion API
 React + Vite        (Proxy CORS)                   v2022-06-28
 ```
 
-La API de Notion bloquea CORS desde browsers. La Cloud Function recibe el request del frontend, lo reenvia a Notion con el token, y devuelve la respuesta. Solo permite paths con prefijo `databases/` o el path `search` (usado para auto-descubrir los databases del usuario).
+La API de Notion bloquea CORS desde browsers. La Cloud Function recibe el request del frontend, lo reenvia a Notion con el token, y devuelve la respuesta. El proxy es restrictivo:
+
+- **Paths permitidos:** `databases/` (lectura de databases + queries), `pages/` (PATCH a paginas para editar), `search` (auto-descubrimiento de databases).
+- **Metodos permitidos:** `GET` (retrieve schemas), `POST` (queries y search), `PATCH` (editar paginas).
+- Todos los demas paths/metodos retornan `403`/`405` desde el proxy sin tocar Notion.
 
 ## Setup local
 
@@ -64,14 +74,16 @@ firebase deploy --only hosting
 
 ```
 src/
-  components/     # UI components (StatCard, Charts, Heatmap, Lists, etc.)
+  components/     # UI components: StatCard, Charts, Heatmap, Lists,
+                  # SelectPopover (inline edit dropdowns), Toaster, etc.
   pages/          # Overview, Habits, Tasks, Projects, Settings
-  hooks/          # useNotionData (fetch + state + derived data)
-  services/       # notion.ts (API + resolver), tokenStore.ts, dbIdsStore.ts
+  hooks/          # useNotionData (fetch + state + mutations + optimistic updates)
+  services/       # notion.ts (API + resolver + mutations), tokenStore.ts,
+                  # dbIdsStore.ts, toastStore.ts (mini pub/sub for toasts)
   types/          # TypeScript interfaces
-  constants.ts    # Habits list, colors
+  constants.ts    # Habits list, colors, NOTION_COLOR_MAP
 functions/
-  src/index.ts    # Cloud Function proxy
+  src/index.ts    # Cloud Function proxy (GET/POST/PATCH on databases/, pages/, search)
 ```
 
 ## Uso

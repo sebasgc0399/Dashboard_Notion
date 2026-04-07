@@ -1,6 +1,6 @@
 import { onRequest } from "firebase-functions/v2/https";
 
-const ALLOWED_PATH_PREFIXES = ["databases/"];
+const ALLOWED_PATH_PREFIXES = ["databases/", "search"];
 const ALLOWED_METHODS = ["POST"];
 
 export const notionProxy = onRequest({ cors: true }, async (req, res) => {

@@ -1,5 +1,10 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { fetchHabits, fetchTasks, fetchProjects } from "@/services/notion";
+import {
+  fetchHabits,
+  fetchTasks,
+  fetchProjects,
+  MissingDbIdError,
+} from "@/services/notion";
 import { HABITS_LIST, HABIT_ABBREVIATIONS } from "@/constants";
 import type {
   HabitDay,
@@ -10,6 +15,7 @@ import type {
   HabitTrend,
   HabitFreq,
   NotionData,
+  DbKey,
 } from "@/types";
 
 function getErrorMessage(error: unknown): string {
@@ -39,45 +45,61 @@ export function useNotionData(): NotionData {
     projects: true,
   });
   const [errors, setErrors] = useState<ErrorState>({});
+  const [dbIdsMissing, setDbIdsMissing] = useState<DbKey[]>([]);
+
+  const handleLoadError = useCallback((key: DbKey, error: unknown) => {
+    if (error instanceof MissingDbIdError) {
+      setDbIdsMissing((prev) =>
+        prev.includes(key) ? prev : [...prev, key]
+      );
+      // Don't surface as a generic error — the banner explains it.
+      setErrors((prev) => ({ ...prev, [key]: undefined }));
+      return;
+    }
+    setErrors((prev) => ({ ...prev, [key]: getErrorMessage(error) }));
+  }, []);
 
   const loadHabits = useCallback(async () => {
     setLoading((prev) => ({ ...prev, habits: true }));
     setErrors((prev) => ({ ...prev, habits: undefined }));
+    setDbIdsMissing((prev) => prev.filter((k) => k !== "habits"));
     try {
       const data = await fetchHabits();
       setHabits(data);
     } catch (error) {
-      setErrors((prev) => ({ ...prev, habits: getErrorMessage(error) }));
+      handleLoadError("habits", error);
     } finally {
       setLoading((prev) => ({ ...prev, habits: false }));
     }
-  }, []);
+  }, [handleLoadError]);
 
   const loadTasks = useCallback(async () => {
     setLoading((prev) => ({ ...prev, tasks: true }));
     setErrors((prev) => ({ ...prev, tasks: undefined }));
+    setDbIdsMissing((prev) => prev.filter((k) => k !== "tasks"));
     try {
       const data = await fetchTasks();
       setTasks(data);
     } catch (error) {
-      setErrors((prev) => ({ ...prev, tasks: getErrorMessage(error) }));
+      handleLoadError("tasks", error);
     } finally {
       setLoading((prev) => ({ ...prev, tasks: false }));
     }
-  }, []);
+  }, [handleLoadError]);
 
   const loadProjects = useCallback(async () => {
     setLoading((prev) => ({ ...prev, projects: true }));
     setErrors((prev) => ({ ...prev, projects: undefined }));
+    setDbIdsMissing((prev) => prev.filter((k) => k !== "projects"));
     try {
       const data = await fetchProjects();
       setProjects(data);
     } catch (error) {
-      setErrors((prev) => ({ ...prev, projects: getErrorMessage(error) }));
+      handleLoadError("projects", error);
     } finally {
       setLoading((prev) => ({ ...prev, projects: false }));
     }
-  }, []);
+  }, [handleLoadError]);
 
   const refresh = useCallback(() => {
     loadHabits();
@@ -157,6 +179,7 @@ export function useNotionData(): NotionData {
     projects,
     loading,
     errors,
+    dbIdsMissing,
     habitTrend,
     avgPct,
     todayData,

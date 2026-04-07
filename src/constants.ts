@@ -15,12 +15,6 @@ export const HABITS_LIST = [
   "No comer dulce",
 ] as const;
 
-export const DB_IDS = {
-  habits: "240485e0-fe4f-83e4-86c3-018061a48f2e",
-  tasks: "eed485e0-fe4f-83e8-a2a0-811192be957a",
-  projects: "a70485e0-fe4f-83da-90ca-0199c37a69aa",
-} as const;
-
 /** Hex colors for Recharts — NOT Tailwind tokens */
 export const CHART_COLORS = {
   emerald: "#10b981",

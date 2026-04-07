@@ -46,12 +46,15 @@ export interface HabitFreq {
   pct: number;
 }
 
+export type DbKey = "habits" | "tasks" | "projects";
+
 export interface NotionData {
   habits: HabitDay[] | null;
   tasks: Task[] | null;
   projects: Project[] | null;
   loading: LoadingState;
   errors: ErrorState;
+  dbIdsMissing: DbKey[];
   habitTrend: HabitTrend[];
   avgPct: number;
   todayData: { pct: number; count: number } | null;

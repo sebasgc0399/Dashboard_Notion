@@ -4,9 +4,11 @@ import {
   Routes,
   Route,
   Navigate,
+  NavLink,
   Outlet,
   useOutletContext,
 } from "react-router";
+import { AlertTriangle } from "lucide-react";
 import { useNotionData } from "@/hooks/useNotionData";
 import { tokenStore } from "@/services/tokenStore";
 import { Layout } from "@/components/Layout";
@@ -15,7 +17,33 @@ import { Habits } from "@/pages/Habits";
 import { Tasks } from "@/pages/Tasks";
 import { Projects } from "@/pages/Projects";
 import { Settings } from "@/pages/Settings";
-import type { NotionData } from "@/types";
+import type { DbKey, NotionData } from "@/types";
+
+const DB_LABELS: Record<DbKey, string> = {
+  habits: "Hábitos",
+  tasks: "Tareas",
+  projects: "Proyectos",
+};
+
+function DbIdsMissingBanner({ missing }: { missing: DbKey[] }) {
+  if (missing.length === 0) return null;
+  const names = missing.map((k) => DB_LABELS[k]).join(", ");
+  return (
+    <div className="mb-4 flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
+      <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+      <div className="flex-1">
+        <p className="font-medium">Faltan databases por configurar: {names}.</p>
+        <p className="mt-0.5 text-xs text-amber-200/80">
+          La integración no encontró estos databases automáticamente.{" "}
+          <NavLink to="/settings" className="underline hover:text-amber-100">
+            Ir a Configuración
+          </NavLink>{" "}
+          para resolverlos manualmente.
+        </p>
+      </div>
+    </div>
+  );
+}
 
 function DashboardShell() {
   const data = useNotionData();
@@ -28,6 +56,7 @@ function DashboardShell() {
 
   return (
     <Layout onRefresh={data.refresh} isLoading={isLoading}>
+      <DbIdsMissingBanner missing={data.dbIdsMissing} />
       <Outlet context={data} />
     </Layout>
   );

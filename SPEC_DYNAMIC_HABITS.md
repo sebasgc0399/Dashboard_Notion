@@ -1,6 +1,6 @@
 # SPEC — Hábitos dinámicos
 
-> Feature spec para que el dashboard descubra la lista de hábitos directamente desde el database de Notion, en vez de tenerla hardcodeada en código. Hoy agregar, quitar, renombrar o reordenar un checkbox en Notion rompe el dashboard silenciosamente; este documento define cómo cerrar ese gap manteniendo el código lo más simple posible.
+> Documentación del feature de **descubrimiento dinámico de hábitos**: cómo el dashboard descubre la lista de hábitos directamente desde el database de Notion en runtime, sin código hardcoded. Esta es la referencia técnica del feature ya implementado y deployado. Para el panorama general del proyecto ver [SPEC.md](SPEC.md). Para el feature de edición interactiva ver [SPEC_INTERACTIVE_EDITS.md](SPEC_INTERACTIVE_EDITS.md).
 
 ## Contexto
 
@@ -21,7 +21,7 @@ El problema: cualquier cambio en la estructura de hábitos en Notion rompe una o
 | Renombrar un checkbox | Se trata como hábito nuevo (ignorado) y el anterior queda siempre vacío. |
 | Reordenar columnas en Notion | El heatmap sigue en el orden hardcodeado de `HABITS_LIST`. |
 
-El objetivo de esta feature es eliminar ese acoplamiento: el dashboard debe descubrir los hábitos **en runtime**, desde el schema del database de Notion.
+El feature eliminó ese acoplamiento: el dashboard descubre los hábitos **en runtime**, desde el schema del database de Notion.
 
 ## Objetivos
 
@@ -42,7 +42,7 @@ El objetivo de esta feature es eliminar ese acoplamiento: el dashboard debe desc
 
 ## Decisiones tomadas
 
-Estas decisiones ya están confirmadas con el usuario y son la base del diseño:
+Las decisiones que enmarcaron el diseño del feature, con el racional original:
 
 | Decisión | Elegido | Razón |
 |----------|---------|-------|
@@ -84,7 +84,7 @@ export interface HabitsData {
 
 `habitNames` vive en el contenedor, no dentro de cada `HabitDay`, porque es información cross-day (no cambia día a día dentro de un mismo fetch).
 
-### Cambios en `services/notion.ts`
+### `services/notion.ts` — descubrimiento de hábitos
 
 ```typescript
 // Propiedades checkbox que nunca son hábitos. Extender si hace falta.
@@ -164,7 +164,7 @@ Notar que se sigue exigiendo la prop `Date` con ese nombre literal. Eso es coher
 
 ### Helper de abreviaturas
 
-Nuevo archivo [src/lib/habitLabel.ts](src/lib/habitLabel.ts):
+El helper vive en [src/lib/habitLabel.ts](src/lib/habitLabel.ts):
 
 ```typescript
 /**
@@ -229,7 +229,7 @@ export function habitAbbreviation(name: string, maxLen = 7): string {
 
 **Trade-off asumido**: este helper no preserva las abreviaturas "bonitas" del template (ej. "NoDulce" para "No comer dulce"). El usuario aceptó esta pérdida a cambio de eliminar por completo el lookup hardcodeado. Si más adelante molesta, se puede agregar un override opcional en `constants.ts`, pero queda fuera del alcance de este spec.
 
-### Cambios en `types/index.ts`
+### `types/index.ts` — extensión
 
 ```typescript
 // Nuevo
@@ -245,7 +245,7 @@ export interface NotionData {
 }
 ```
 
-### Cambios en `hooks/useNotionData.ts`
+### `hooks/useNotionData.ts` — propagación
 
 1. Nuevo estado:
    ```typescript
@@ -285,7 +285,7 @@ export interface NotionData {
 
 5. `habitNames` se expone en el objeto de retorno del hook.
 
-### Cambios en `components/HabitHeatmap.tsx`
+### `components/HabitHeatmap.tsx` — empty state dinámico
 
 - Nueva prop: `habitNames: string[]`.
 - Quitar `import { HABITS_LIST } from "@/constants"`.
@@ -301,21 +301,20 @@ export interface NotionData {
     );
   }
   ```
-  Nota: este empty state es distinto del empty state general de `Habits.tsx` que se dispara cuando no hay días registrados.
+  Nota: este empty state es distinto del empty state general de `Habits.tsx` que se dispara cuando no hay días registrados. **Importante para extender el componente**: el early return va **después** de los `useState`/`useMemo`, no antes — si no, viola la regla de hooks de React (los hooks deben ejecutarse en el mismo orden en cada render).
 
-### Cambios en `pages/Habits.tsx` y `App.tsx`
+### `pages/Habits.tsx` y `App.tsx` — propagación de prop
 
 - `Habits.tsx`: nueva prop `habitNames`, pasada al `HabitHeatmap`.
 - `App.tsx`: destructurar `habitNames` del hook y pasarlo al `<Habits />`.
 
 No hay cambios en `HabitConsistencyChart` — sigue recibiendo `HabitFreq[]` ya armado.
 
-### Limpieza final en `constants.ts`
+### `constants.ts` — limpieza
 
-- **Eliminar** `HABITS_LIST` (líneas 1-16).
-- **Eliminar** `HABIT_ABBREVIATIONS` (líneas 85-100).
-- Mantener `CHART_COLORS`, `STATUS_COLORS`, `PRIORITY_COLORS`, `NOTION_COLOR_MAP`, `getNotionColor`.
-- Después de borrar, `grep -rn "HABITS_LIST\|HABIT_ABBREVIATIONS" src/` no debe devolver nada.
+- `HABITS_LIST` y `HABIT_ABBREVIATIONS` fueron eliminadas del archivo.
+- Las constantes que se mantienen: `CHART_COLORS`, `STATUS_COLORS`, `PRIORITY_COLORS`, `NOTION_COLOR_MAP`, `getNotionColor`.
+- **Check de regresión** para futuras modificaciones: `grep -rn "HABITS_LIST\|HABIT_ABBREVIATIONS" src/` debe devolver vacío. Si aparece algo, es código muerto que se reintrodujo y hay que limpiarlo.
 
 ## Manejo de edge cases
 
@@ -351,79 +350,26 @@ No es un riesgo nuevo — `fetchEditableSchema` en [src/services/notion.ts:338-3
 
 ### Compatibilidad con el feature de "Interactive Edits"
 
-El spec anterior (`SPEC_INTERACTIVE_EDITS.md`) dejó `updateHabitCheckbox` usando `habitName` directamente como nombre de propiedad en el PATCH. Eso sigue funcionando: los nombres que `HabitHeatmap` le pasa al `updateHabit` del hook ahora vienen de `habitNames` (runtime), no de `HABITS_LIST` (build time), pero siguen siendo los nombres reales de las properties del DB — que es exactamente lo que Notion espera.
+El feature de edición interactiva ([SPEC_INTERACTIVE_EDITS.md](SPEC_INTERACTIVE_EDITS.md)) dejó `updateHabitCheckbox` usando `habitName` directamente como nombre de propiedad en el PATCH. Eso sigue funcionando: los nombres que `HabitHeatmap` le pasa al `updateHabit` del hook ahora vienen de `habitNames` (runtime), no de `HABITS_LIST` (build time), pero siguen siendo los nombres reales de las properties del DB — que es exactamente lo que Notion espera.
 
-Cero cambios en las mutaciones de hábitos.
+Cero cambios en las mutaciones de hábitos. La integración entre los dos features funciona transparentemente.
 
-## Plan de Implementación
+## Estado actual
 
-### Fase 1 — Tipos
-- [ ] Agregar `HabitsData` a [src/types/index.ts](src/types/index.ts).
-- [ ] Agregar `habitNames: string[]` a `NotionData`.
+El feature está implementado, deployado y funcionando. Se ejecutó en 8 fases pequeñas, manteniendo el repo compilable después de cada una (`npx tsc --noEmit` limpio entre fases). Las únicas divergencias respecto al diseño original fueron:
 
-### Fase 2 — Servicio
-- [ ] Agregar `HABITS_PROP_BLACKLIST` y `extractHabitNames` locales en [src/services/notion.ts](src/services/notion.ts).
-- [ ] Reescribir `fetchHabits` para devolver `HabitsData` (schema fetch + query + build).
-- [ ] Relajar `schemaMatches(db, "habits")` para que use `extractHabitNames` en vez de `HABITS_LIST`.
+- **Helper como archivo separado**: durante la implementación se eligió `src/lib/habitLabel.ts` en lugar de integrar el helper en `src/lib/utils.ts`. Razón: mantener `utils.ts` como bucket de helpers genéricos cross-domain (`cn` y futuros), y aislar el helper de dominio en su propio archivo.
+- **`habitNames` opcional durante el rollout**: en la primera fase (tipos) se declaró como `habitNames?: string[]` en `NotionData` para mantener el repo compilable mientras la fase de hook propagaba el valor. Una vez que el hook ya exponía `habitNames`, se removió el `?` para volverlo required.
 
-### Fase 3 — Helper
-- [ ] Crear [src/lib/habitLabel.ts](src/lib/habitLabel.ts) con `habitAbbreviation`.
+Para extender el feature (ej. soportar otros tipos de propiedades como hábitos, agregar configuración de blacklist desde Settings, restaurar abreviaturas "bonitas" como override) los puntos de entrada son:
 
-### Fase 4 — Hook
-- [ ] Extender [src/hooks/useNotionData.ts](src/hooks/useNotionData.ts):
-  - Nuevo state `habitNames`.
-  - `loadHabits` destructura y setea ambos.
-  - `updateHabit` usa `habitNames.length` como denominador (y suma `habitNames` a las deps del useCallback).
-  - `habitFreq` itera `habitNames` y usa `habitAbbreviation`.
-  - Expone `habitNames` en el retorno.
+- **`services/notion.ts`** — `extractHabitNames` y `HABITS_PROP_BLACKLIST` para descubrimiento; `fetchHabits` para parseo.
+- **`lib/habitLabel.ts`** — `habitAbbreviation` para presentación de labels.
+- **`hooks/useNotionData.ts`** — estado `habitNames` y propagación al `NotionData`.
 
-### Fase 5 — UI
-- [ ] [src/components/HabitHeatmap.tsx](src/components/HabitHeatmap.tsx): nueva prop, empty state, quitar import de constantes, iterar `habitNames`.
-- [ ] [src/pages/Habits.tsx](src/pages/Habits.tsx): propagar `habitNames` al heatmap.
-- [ ] [src/App.tsx](src/App.tsx): destructurar del hook y pasar a `<Habits />`.
+## Follow-ups conocidos
 
-### Fase 6 — Limpieza
-- [ ] Borrar `HABITS_LIST` y `HABIT_ABBREVIATIONS` de [src/constants.ts](src/constants.ts).
-- [ ] Verificar que no queden imports huérfanos: `grep -rn "HABITS_LIST\|HABIT_ABBREVIATIONS" src/` debe devolver vacío.
-- [ ] `npm run build` debe pasar sin errores de TS.
+Estos puntos quedaron deliberadamente fuera del feature original. Son extensiones posibles si el uso real lo justifica:
 
-### Fase 7 — Verificación end-to-end
-
-Pruebas manuales en Notion + dashboard local:
-
-- [ ] **Caso base**: dashboard funciona con los 14 hábitos del template actual.
-- [ ] **Agregar**: crear un checkbox "Journaling" en el DB de Hábitos → refresh → aparece en el heatmap y en el chart de consistencia, sin deploy.
-- [ ] **Quitar**: eliminar "Gratitud" del DB → refresh → desaparece del heatmap y del chart; el `pct` de los días se recalcula sobre 13 (o el total nuevo) en vez de 14.
-- [ ] **Renombrar**: renombrar "Ejercicio" → "Gym" → refresh → aparece como "Gym" en el heatmap; los días viejos muestran "Gym" como no completado (no tenían esa prop). Aceptado.
-- [ ] **Reordenar**: mover "Leer" al primer lugar en el DB → refresh → el heatmap muestra "Leer" en la primera fila.
-- [ ] **DB con páginas pero sin checkboxes**: temporalmente quitar todos los checkboxes del DB (dejar solo Date) → refresh → empty state "No hay hábitos configurados en tu database de Notion".
-- [ ] **DB con solo "Archive"**: agregar un checkbox "Archive" como única prop checkbox → refresh → mismo empty state (blacklist lo filtra).
-- [ ] **DB vacío**: archivar todas las páginas del DB pero dejar los checkboxes → refresh → empty state habitual de "No hay registros en los últimos 30 días", la lista de hábitos visible no aplica acá porque `habits.length === 0`.
-- [ ] **Optimistic update con nuevo total**: con 15 hábitos en el DB, togglear uno → el `pct` de ese día se actualiza usando `/15`, no `/14`.
-- [ ] **Mutación + edit (regresión del feature anterior)**: togglear un hábito → se persiste en Notion correctamente. Verifica que la integración entre `SPEC_INTERACTIVE_EDITS` y este feature sigue funcionando.
-
-### Fase 8 — Deploy
-- [ ] `npm run build` exitoso.
-- [ ] `firebase deploy --only hosting` (no hay cambios en functions).
-- [ ] Smoke test en producción con la cuenta personal — repetir los casos 1-3 de la verificación.
-- [ ] Actualizar [README.md](README.md) con una nota breve: "El dashboard descubre los hábitos automáticamente desde los checkboxes de tu database de Notion. Para agregar, quitar o reordenar hábitos, editá el database directamente."
-
-## Archivos a modificar / crear
-
-**Modificar:**
-- [src/constants.ts](src/constants.ts) — eliminar `HABITS_LIST` y `HABIT_ABBREVIATIONS`.
-- [src/services/notion.ts](src/services/notion.ts) — `fetchHabits` nueva firma + blacklist + `schemaMatches` relajado.
-- [src/types/index.ts](src/types/index.ts) — `HabitsData`, `NotionData.habitNames`.
-- [src/hooks/useNotionData.ts](src/hooks/useNotionData.ts) — estado, `habitFreq`, `updateHabit`.
-- [src/components/HabitHeatmap.tsx](src/components/HabitHeatmap.tsx) — prop + empty state + quitar import.
-- [src/pages/Habits.tsx](src/pages/Habits.tsx) — propagar prop.
-- [src/App.tsx](src/App.tsx) — propagar prop.
-- [README.md](README.md) — nota breve sobre el nuevo comportamiento dinámico.
-
-**Crear:**
-- [src/lib/habitLabel.ts](src/lib/habitLabel.ts) — helper `habitAbbreviation`.
-
-## Decisiones abiertas
-
-- **¿Empty state del heatmap cuando `habitNames.length === 0` debería linkear a algún lado?** Propuesta: solo mensaje descriptivo, sin link. Settings no ayuda (hay que editar el database en Notion, no la app). El README puede linkear la documentación del template si hace falta.
-- **¿Vale la pena un override opcional para abreviaturas "bonitas"?** No por ahora — el truncate automático es suficiente. Si molesta visualmente después de usarlo, se evalúa como follow-up.
+- **Empty state del heatmap con link**: cuando `habitNames.length === 0`, hoy se muestra solo el mensaje descriptivo. No linkea a ningún lado porque la acción que arregla el problema (agregar checkboxes) es en Notion, no en la app. Si una versión futura agrega un onboarding o doc del template, este empty state podría linkear allí.
+- **Override de abreviaturas "bonitas"**: el truncate automático funciona bien pero pierde detalles del template original (ej. `"NoDulce"` para "No comer dulce" pasa a `"No com."`). Si visualmente molesta, se podría agregar un map opcional `HABIT_LABEL_OVERRIDES` en `constants.ts` que el helper consulte como primera opción antes de hacer truncate.

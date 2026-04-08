@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { HABITS_LIST } from "@/constants";
 import { cn } from "@/lib/utils";
 import type { HabitDay } from "@/types";
 
@@ -9,6 +8,7 @@ const COLOR_NO_DATA = "#131316";
 
 interface HabitHeatmapProps {
   habits: HabitDay[];
+  habitNames: string[];
   pendingMutations: Set<string>;
   updateHabit: (dayPageId: string, habit: string, value: boolean) => void;
 }
@@ -46,7 +46,7 @@ function cellColor(state: CellInfo["state"]): string {
   }
 }
 
-export function HabitHeatmap({ habits, pendingMutations, updateHabit }: HabitHeatmapProps) {
+export function HabitHeatmap({ habits, habitNames, pendingMutations, updateHabit }: HabitHeatmapProps) {
   const [tooltip, setTooltip] = useState<CellInfo | null>(null);
 
   // Days sorted ascending (oldest first for left-to-right)
@@ -67,6 +67,15 @@ export function HabitHeatmap({ habits, pendingMutations, updateHabit }: HabitHea
   }
 
   const colCount = dates.length;
+
+  if (habitNames.length === 0) {
+    return (
+      <p className="text-sm text-text-muted">
+        No hay hábitos configurados en tu database de Notion. Agregá
+        propiedades de tipo checkbox al database para que aparezcan acá.
+      </p>
+    );
+  }
 
   return (
     <div className="relative">
@@ -93,7 +102,7 @@ export function HabitHeatmap({ habits, pendingMutations, updateHabit }: HabitHea
           ))}
 
           {/* Habit rows */}
-          {HABITS_LIST.map((habit) => (
+          {habitNames.map((habit) => (
             <div key={habit} className="contents">
               {/* Habit label */}
               <div className="flex items-center pr-2 text-xs text-text-secondary truncate">

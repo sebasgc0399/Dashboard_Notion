@@ -8,6 +8,7 @@ import type { HabitDay, HabitFreq } from "@/types";
 
 interface HabitsProps {
   habits: HabitDay[] | null;
+  habitNames: string[];
   habitFreq: HabitFreq[];
   loading: boolean;
   error?: string;
@@ -18,6 +19,7 @@ interface HabitsProps {
 
 export function Habits({
   habits,
+  habitNames,
   habitFreq,
   loading,
   error,
@@ -56,6 +58,7 @@ export function Habits({
         </h2>
         <HabitHeatmap
           habits={habits}
+          habitNames={habitNames}
           pendingMutations={pendingMutations}
           updateHabit={updateHabit}
         />

@@ -5,6 +5,11 @@ export interface HabitDay {
   pct: number;
 }
 
+export interface HabitsData {
+  habits: HabitDay[];
+  habitNames: string[];
+}
+
 export interface SchemaOption {
   name: string;
   color: string;
@@ -75,6 +80,7 @@ export type DbKey = "habits" | "tasks" | "projects";
 
 export interface NotionData {
   habits: HabitDay[] | null;
+  habitNames: string[];
   tasks: Task[] | null;
   projects: Project[] | null;
   loading: LoadingState;

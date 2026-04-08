@@ -1,20 +1,3 @@
-export const HABITS_LIST = [
-  "Ejercicio",
-  "Codear",
-  "Leer",
-  "Meditar",
-  "Comer bien",
-  "Tomar agua",
-  "Planificar el día",
-  "Madrugar",
-  "Gratitud",
-  "Practicar inglés",
-  "Tiempo con pareja",
-  "Estirar",
-  "Tender la cama",
-  "No comer dulce",
-] as const;
-
 /** Hex colors for Recharts — NOT Tailwind tokens */
 export const CHART_COLORS = {
   emerald: "#10b981",
@@ -81,20 +64,3 @@ export function getNotionColor(color: string | undefined) {
   return NOTION_COLOR_MAP[color ?? "default"] ?? NOTION_COLOR_MAP.default;
 }
 
-/** Abbreviations for habit names (chart axes) */
-export const HABIT_ABBREVIATIONS: Record<string, string> = {
-  "Ejercicio": "Ejerc.",
-  "Codear": "Codear",
-  "Leer": "Leer",
-  "Meditar": "Medit.",
-  "Comer bien": "Comer",
-  "Tomar agua": "Agua",
-  "Planificar el día": "Planif.",
-  "Madrugar": "Madrug.",
-  "Gratitud": "Grat.",
-  "Practicar inglés": "Inglés",
-  "Tiempo con pareja": "Pareja",
-  "Estirar": "Estir.",
-  "Tender la cama": "Cama",
-  "No comer dulce": "NoDulce",
-} as const;

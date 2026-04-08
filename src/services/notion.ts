@@ -1,8 +1,8 @@
 import { tokenStore } from "./tokenStore";
 import { dbIdsStore, type DbIds, type DbKey } from "./dbIdsStore";
-import { HABITS_LIST } from "@/constants";
 import type {
   HabitDay,
+  HabitsData,
   Task,
   Project,
   DbSchema,
@@ -102,6 +102,26 @@ function requireDbId(key: DbKey): string {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// Habits — descubrimiento dinámico de checkboxes
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Propiedades checkbox del DB de Hábitos que NO son hábitos. Extender si
+ * algún workspace tiene checkboxes utilitarios adicionales.
+ */
+const HABITS_PROP_BLACKLIST = new Set<string>(["Archive"]);
+
+function extractHabitNames(properties: Record<string, any>): string[] {
+  const names: string[] = [];
+  for (const [name, def] of Object.entries(properties)) {
+    if (def?.type !== "checkbox") continue;
+    if (HABITS_PROP_BLACKLIST.has(name)) continue;
+    names.push(name);
+  }
+  return names;
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // Database ID resolver
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -114,7 +134,7 @@ const NAME_HEURISTICS: Record<DbKey, string[]> = {
 };
 
 const REQUIRED_PROPS: Record<DbKey, Array<{ name: string; type: string }>> = {
-  // habits is special-cased below (checks for HABITS_LIST checkboxes)
+  // habits is special-cased below (checks for any checkbox via extractHabitNames)
   habits: [{ name: "Date", type: "date" }],
   tasks: [
     { name: "Nombre", type: "title" },
@@ -152,10 +172,8 @@ function schemaMatches(db: any, key: DbKey): boolean {
 
   if (key === "habits") {
     if (props.Date?.type !== "date") return false;
-    const habitCheckboxes = HABITS_LIST.filter(
-      (habit) => props[habit]?.type === "checkbox"
-    );
-    return habitCheckboxes.length >= 3;
+    // Necesita la prop Date + ≥1 checkbox que no esté en la blacklist.
+    return extractHabitNames(props).length >= 1;
   }
 
   return REQUIRED_PROPS[key].every(({ name, type }) => {
@@ -261,32 +279,44 @@ export async function testConnection(): Promise<boolean> {
 // Data fetchers
 // ────────────────────────────────────────────────────────────────────────────
 
-export async function fetchHabits(): Promise<HabitDay[]> {
+export async function fetchHabits(): Promise<HabitsData> {
   const dbId = requireDbId("habits");
+
+  // 1) Schema fetch — necesario para conocer habitNames incluso si el DB
+  //    está vacío. Cuesta 1 request extra; es marginal.
+  const dbRes = await callProxy(`databases/${dbId}`, { method: "GET" });
+  const habitNames = extractHabitNames(dbRes.properties ?? {});
+
+  // 2) Query de los últimos 30 días.
   const res = await queryNotion(dbId, {
     page_size: 30,
     sorts: [{ property: "Date", direction: "descending" }],
   });
 
-  const totalHabits = HABITS_LIST.length;
+  const totalHabits = habitNames.length;
 
-  return res.results
-    .map((result: any) => {
+  const habits: HabitDay[] = res.results
+    .map((result: any): HabitDay | null => {
       const date = result.properties.Date?.date?.start;
       if (!date) return null;
 
-      const completed = HABITS_LIST.filter(
+      const completed = habitNames.filter(
         (h) => result.properties[h]?.checkbox === true
       );
 
       return {
         id: result.id,
         date,
-        completed: completed as string[],
-        pct: Math.round((completed.length / totalHabits) * 100),
+        completed,
+        pct:
+          totalHabits === 0
+            ? 0
+            : Math.round((completed.length / totalHabits) * 100),
       };
     })
     .filter((item: HabitDay | null): item is HabitDay => item !== null);
+
+  return { habits, habitNames };
 }
 
 export async function fetchTasks(): Promise<Task[]> {
@@ -405,7 +435,7 @@ export async function updateHabitCheckbox(
   habitName: string,
   value: boolean
 ): Promise<void> {
-  // El nombre del checkbox es el nombre del hábito (acoplamiento explícito con HABITS_LIST).
+  // El nombre del checkbox es el nombre del hábito — viene de habitNames (descubierto dinámicamente del schema).
   await patchPage(pageId, {
     [habitName]: { checkbox: value },
   });

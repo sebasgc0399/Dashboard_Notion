@@ -14,7 +14,7 @@ import {
   SchemaPropNotFoundError,
 } from "@/services/notion";
 import { toastStore } from "@/services/toastStore";
-import { HABITS_LIST, HABIT_ABBREVIATIONS } from "@/constants";
+import { habitAbbreviation } from "@/lib/habitLabel";
 import type {
   HabitDay,
   Task,
@@ -165,6 +165,7 @@ function getErrorMessage(error: unknown): string {
 
 export function useNotionData(): NotionData {
   const [habits, setHabits] = useState<HabitDay[] | null>(null);
+  const [habitNames, setHabitNames] = useState<string[]>([]);
   const [tasks, setTasks] = useState<Task[] | null>(null);
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [loading, setLoading] = useState<LoadingState>({
@@ -203,8 +204,9 @@ export function useNotionData(): NotionData {
     setErrors((prev) => ({ ...prev, habits: undefined }));
     setDbIdsMissing((prev) => prev.filter((k) => k !== "habits"));
     try {
-      const data = await fetchHabits();
-      setHabits(data);
+      const { habits, habitNames } = await fetchHabits();
+      setHabits(habits);
+      setHabitNames(habitNames);
     } catch (error) {
       handleLoadError("habits", error);
     } finally {
@@ -401,7 +403,10 @@ export function useNotionData(): NotionData {
               return {
                 ...d,
                 completed,
-                pct: Math.round((completed.length / HABITS_LIST.length) * 100),
+                pct:
+                  habitNames.length === 0
+                    ? 0
+                    : Math.round((completed.length / habitNames.length) * 100),
               };
             }) ?? null
           );
@@ -411,7 +416,7 @@ export function useNotionData(): NotionData {
         errorContext: { entity: "habit", field: habit },
       });
     },
-    [habits, requestMutation]
+    [habits, habitNames, requestMutation]
   );
 
   const updateTask = useCallback(
@@ -554,22 +559,23 @@ export function useNotionData(): NotionData {
   }, [projects]);
 
   const habitFreq = useMemo<HabitFreq[]>(() => {
-    if (!habits || habits.length === 0) return [];
+    if (!habits || habits.length === 0 || habitNames.length === 0) return [];
     const totalDays = habits.length;
-    return HABITS_LIST.map((habit) => {
+    return habitNames.map((habit) => {
       const count = habits.filter((day) =>
         day.completed.includes(habit)
       ).length;
       return {
-        name: HABIT_ABBREVIATIONS[habit] || habit,
+        name: habitAbbreviation(habit),
         full: habit,
         pct: Math.round((count / totalDays) * 100),
       };
     });
-  }, [habits]);
+  }, [habits, habitNames]);
 
   return {
     habits,
+    habitNames,
     tasks,
     projects,
     loading,

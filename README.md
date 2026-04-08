@@ -7,7 +7,7 @@ Dashboard web de productividad que visualiza **y edita** datos de un workspace d
 ## Vistas
 
 - **General** - 4 KPIs + tendencia de habitos + distribucion de tareas + proyectos en progreso *(solo lectura)*
-- **Habitos** - Heatmap (14 habitos x 30 dias) + chart de consistencia. **Click en una celda** para togglear el checkbox del dia
+- **Habitos** - Heatmap dinamico (todos los checkboxes del database x 30 dias) + chart de consistencia. **Click en una celda** para togglear el checkbox del dia
 - **Tareas** - Lista completa. Status, prioridad y fecha **editables inline** (click en el chip o la fecha)
 - **Proyectos** - Distribucion por status + lista. Status y prioridad **editables inline**
 - **Settings** - Configuracion del Notion Integration Token + override manual de IDs de databases
@@ -17,6 +17,17 @@ Dashboard web de productividad que visualiza **y edita** datos de un workspace d
 Las ediciones usan **optimistic updates con rollback**: el cambio se ve al instante en pantalla y en background se sincroniza con Notion. Si Notion rechaza la mutacion (token expirado, valor invalido, falta capability, timeout >12s, etc.), el UI hace rollback al ultimo valor confirmado y muestra un toast con la causa. Clicks rapidos sobre el mismo campo se **coalescen**: solo el ultimo valor llega a Notion, los intermedios se descartan.
 
 Mientras hay mutaciones en vuelo, el boton de refresh queda deshabilitado para evitar clobbering del estado optimista.
+
+### Habitos dinamicos
+
+El dashboard descubre la lista de habitos automaticamente desde los checkboxes del database de Habitos en Notion. **No hay lista hardcodeada**: agregar, quitar, renombrar o reordenar checkboxes en Notion se refleja en el dashboard al refrescar, sin tocar codigo ni redesplegar.
+
+- **Agregar un habito:** crea un nuevo checkbox en el database -> refresh -> aparece como nueva fila en el heatmap.
+- **Quitar un habito:** borra el checkbox -> refresh -> desaparece. El `pct` se recalcula sobre el total nuevo.
+- **Reordenar:** cambia el orden de las columnas en Notion -> refresh -> el heatmap respeta el nuevo orden.
+- **Renombrar:** se trata como remover + agregar (la data historica del nombre viejo no se preserva visualmente).
+
+Hay una unica excepcion hardcodeada: el checkbox `Archive` se ignora siempre porque es utilitario, no un habito. Si tu workspace tiene otros checkboxes utilitarios que quedan apareciendo como habitos, agregalos a `HABITS_PROP_BLACKLIST` en `src/services/notion.ts`.
 
 ## Stack
 
@@ -78,10 +89,11 @@ src/
                   # SelectPopover (inline edit dropdowns), Toaster, etc.
   pages/          # Overview, Habits, Tasks, Projects, Settings
   hooks/          # useNotionData (fetch + state + mutations + optimistic updates)
+  lib/            # utils.ts (cn helper), habitLabel.ts (chart label abbreviator)
   services/       # notion.ts (API + resolver + mutations), tokenStore.ts,
                   # dbIdsStore.ts, toastStore.ts (mini pub/sub for toasts)
   types/          # TypeScript interfaces
-  constants.ts    # Habits list, colors, NOTION_COLOR_MAP
+  constants.ts    # Colors, NOTION_COLOR_MAP, getNotionColor helper
 functions/
   src/index.ts    # Cloud Function proxy (GET/POST/PATCH on databases/, pages/, search)
 ```

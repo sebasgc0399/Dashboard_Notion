@@ -114,6 +114,7 @@ function HabitsPage() {
   return (
     <Habits
       habits={data.habits}
+      habitNames={data.habitNames}
       habitFreq={data.habitFreq}
       loading={data.loading.habits}
       error={data.errors.habits}
